@@ -2,11 +2,11 @@
 #include <ArduinoOTA.h>
 #include <ld2410.h>
 #include <Adafruit_NeoPixel.h>
+#include <WiFi.h>
 
 
-
-const char *ssid = "xxxxxxx";
-const char *password = "xxxxxxx";
+const char *ssid = "mikesnet";
+const char *password = "springchicken";
 
 #define LED_PIN 5
 #define DEFAULT_NUM_LEDS 33
@@ -45,6 +45,7 @@ int currentDistance = 0;
 unsigned long turnOnTime = 0;
 bool isLightOn = false;
 bool wasTriggered = false;
+unsigned long lastMotionTime = 0; // Add this global variable
 
 
 void setupEEPROM() {
@@ -190,18 +191,30 @@ bool processRadarReading() {
   radar.read();
 
   if (radar.isConnected()) {
-      currentDistance = radar.movingTargetDistance();
+      int movingDistance = radar.movingTargetDistance();
+      currentDistance = movingDistance;
       if (currentDistance == 0) currentDistance = radar.stationaryTargetDistance();
       Serial.println(currentDistance);
+
+      // Update lastMotionTime if motion detected
+      if (movingDistance > 0) {
+          lastMotionTime = millis();
+      }
 
       // Only turn on lights when motion is detected in threshold zone
       if (currentDistance >= (maxDistance - THRESHOLD_VAL) && currentDistance <= maxDistance) {
           isLightOn = true;
           turnOnTime = millis();
-      } else if (millis() - turnOnTime > 5000) { // Turn off after 30 seconds
+      } else if (millis() - turnOnTime > 5000) { // Turn off after 5 seconds (was 30)
           isLightOn = false;
-      } else if (currentDistance <= minDistance) {isLightOn = false;}
-      
+      } else if (currentDistance <= minDistance) {
+          isLightOn = false;
+      }
+
+      // NEW: If lights are on, but no motion for >10s, turn off
+      if (isLightOn && (millis() - lastMotionTime > 10000)) {
+          isLightOn = false;
+      }
 
       if (currentDistance < minDistance) currentDistance = minDistance;
       
