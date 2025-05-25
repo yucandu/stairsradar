@@ -30,7 +30,7 @@ const char *password = "springchicken";
 #define RADAR_RX_PIN 21
 #define RADAR_TX_PIN 20
 
-#define THRESHOLD_VAL 175
+int THRESHOLD_VAL = 175;
 #define FADE_STEPS 255  // How many steps to take during fade
 int fadeTime = 5;    // Time in ms for full fade transition
 unsigned long lastFadeUpdate = 0;
@@ -60,15 +60,17 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(DEFAULT_NUM_LEDS, LED_PIN, NEO_GRB +
 WidgetTerminal terminal(V50);
 
 BLYNK_WRITE(V50) {
-  if (String("help") == param.asStr()) {
+  String cmd = param.asStr();
+  if (cmd == "help") {
     terminal.println("==List of available commands:==");
     terminal.println("wifi");
     terminal.println("blink");
     terminal.println("reset");
     terminal.println("dist");
+    terminal.println("t### (set threshold, e.g. t100)");
     terminal.println("==End of list.==");
   }
-  if (String("wifi") == param.asStr()) {
+  if (cmd == "wifi") {
     terminal.print("Connected to: ");
     terminal.println(ssid);
     terminal.print("IP address:");
@@ -78,22 +80,21 @@ BLYNK_WRITE(V50) {
     //printLocalTime();
   }
 
-  if (String("blink") == param.asStr()) {
+  if (cmd == "blink") {
     terminal.println("Blinking...");
     for(int i = 0; i < DEFAULT_NUM_LEDS; i++) {
       strip.setPixelColor(i, strip.Color(0, 148, 211)); // GRB for violet
     }
-    //strip.setPixelColor(3, strip.Color(0, 148, 211)); // GRB for violet
     strip.show(); // Initialize all pixels to 'off'
     delay(1000);
   }
 
-  if (String("reset") == param.asStr()) {
+  if (cmd == "reset") {
     terminal.println("Restarting...");
     terminal.flush();
     ESP.restart();
   }
-  if (String("dist") == param.asStr()) {
+  if (cmd == "dist") {
     getDistance = !getDistance;
     radar.read();
 
@@ -108,8 +109,21 @@ BLYNK_WRITE(V50) {
     else {
       terminal.println("Radar is NOT connected!");
     }
-
   }
+
+  // Handle threshold command: t###
+  if (cmd.startsWith("t")) {
+    String valStr = cmd.substring(1);
+    int val = valStr.toInt();
+    if (val > 0 && val < 1000) {
+      THRESHOLD_VAL = val;
+      terminal.print("THRESHOLD_VAL set to: ");
+      terminal.println(THRESHOLD_VAL);
+    } else {
+      terminal.println("Invalid threshold value!");
+    }
+  }
+
   terminal.flush();
 }
 
